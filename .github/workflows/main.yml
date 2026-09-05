@@ -36,8 +36,8 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.ref }}-${{ inputs.leg || github.event_name }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.ref }}-${{ inputs.leg || 'push' }}-${{ inputs.racecar_run }}
+  cancel-in-progress: false
 
 env:
   # The one variable that separates the arms. On baseline, action-checkout

@@ -36,7 +36,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.ref }}
+  group: ${{ github.ref }}-${{ inputs.leg || github.event_name }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

@@ -251,149 +251,13 @@ jobs:
           ACTIONS_RUNTIME_TOKEN: ${{ env.ACTIONS_RUNTIME_TOKEN }}
           ACTIONS_RUNTIME_URL: "${{ env.ACTIONS_RUNTIME_URL }}"
 
-  pack-native-runtime:
-    name: PackNativeRuntime
-    needs: [ build ]
-    runs-on: ubuntu-latest
-    permissions:
-        packages: write
-        contents: write
-        id-token: write
-    steps:
-        - name: Clone Repository
-          uses: crashappsec/action-checkout@main
-          with:
-            chalk: ${{ env.CHALK_ON }}
-            profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
-            # inert at action-checkout@main (not an input there); kept for forward-compat
-            observables_continue_on_error: false
-            # action-checkout defaults LFS on; actions/checkout does not
-            lfs: false
-            submodules: recursive
-        - name: Assert instrumentation is live
-          if: env.CHALK_ON == 'true'
-          run: |
-            test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
-            test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
+  # racecar: `pack-native-runtime` and `package-binaries` removed. Both consume the
+  # mgnative-windows-*/mgnative-macos-* artifacts uploaded by the windows-2022 and
+  # macos-26 build legs, which this Linux-only testbed does not run, so
+  # "Pack Native Runtime" fails with "Artifact mgnative-windows-dx-x64.<ver> not found".
 
-        - name: Generate global.json
-          run: |
-            echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
-
-        - name: Setup .NET Core SDK
-          uses: actions/setup-dotnet@v5
-          with:
-            dotnet-version: '${{ env.DotnetVersion }}'
-            global-json-file: "./global.json"
-
-        - name: Expose GitHub Runtime
-          uses: crazy-max/ghaction-github-runtime@v3
-
-        - name: Pack Native Runtime
-          run: dotnet run --project build/Build.csproj -- --target="Pack Native Runtime"
-          env:
-            ACTIONS_RUNTIME_TOKEN: ${{ env.ACTIONS_RUNTIME_TOKEN }}
-            ACTIONS_RUNTIME_URL: "${{ env.ACTIONS_RUNTIME_URL }}"
-
-  package-binaries:
-    name: PackageBinaries
-    needs: [ build, pack-native-runtime, tests ]
-    runs-on: ubuntu-latest
-    permissions:
-        packages: write
-        contents: write
-        id-token: write
-    steps:
-        - name: Clone Repository
-          uses: crashappsec/action-checkout@main
-          with:
-            chalk: ${{ env.CHALK_ON }}
-            profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
-            # inert at action-checkout@main (not an input there); kept for forward-compat
-            observables_continue_on_error: false
-            # action-checkout defaults LFS on; actions/checkout does not
-            lfs: false
-            submodules: recursive
-        - name: Assert instrumentation is live
-          if: env.CHALK_ON == 'true'
-          run: |
-            test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
-            test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
-
-        - name: Generate global.json
-          run: |
-            echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
-
-        - name: Setup .NET Core SDK
-          uses: actions/setup-dotnet@v5
-          with:
-            dotnet-version: '${{ env.DotnetVersion }}'
-
-        - name: Expose GitHub Runtime
-          uses: crazy-max/ghaction-github-runtime@v3
-
-        - name: Upload Binaries package
-          run: dotnet run --project build/Build.csproj -- --target=DeployBinaries
-          env:
-            ACTIONS_RUNTIME_TOKEN: ${{ env.ACTIONS_RUNTIME_TOKEN }}
-            ACTIONS_RUNTIME_URL: "${{ env.ACTIONS_RUNTIME_URL }}"
-
-  deploy:
-    name: Deploy
-    needs: [ build, pack-native-runtime, tests ]
-    runs-on: ubuntu-latest
-    if: ${{ 'push' == 'push' }}
-    permissions:
-        packages: write
-        contents: write
-        id-token: write
-    steps:
-        - name: Clone Repository
-          uses: crashappsec/action-checkout@main
-          with:
-            chalk: ${{ env.CHALK_ON }}
-            profile: ${{ inputs.profile || 'curiosity-tests-racecar' }}
-            # inert at action-checkout@main (not an input there); kept for forward-compat
-            observables_continue_on_error: false
-            # action-checkout defaults LFS on; actions/checkout does not
-            lfs: false
-            submodules: recursive
-        - name: Assert instrumentation is live
-          if: env.CHALK_ON == 'true'
-          run: |
-            test -n "${CURIOSITY_ROOT:-}" || { echo "::error::CURIOSITY_ROOT unset - observables never installed"; exit 1; }
-            test -S "${CURIOSITY_SOCKET_NAME:?socket name unset}" || { echo "::error::co-hostd socket absent"; exit 1; }
-
-        - name: Generate global.json
-          run: |
-            echo '{ "sdk": { "version": "${{ env.DotnetVersion }}" } }' > global.json
-
-        - name: Setup .NET Core SDK
-          uses: actions/setup-dotnet@v5
-          with:
-            dotnet-version: '${{ env.DotnetVersion }}'
-            global-json-file: "./global.json"
-
-        - name: Expose GitHub Runtime
-          uses: crazy-max/ghaction-github-runtime@v3
-
-        - name: Push Nugets
-          run: dotnet run --project build/Build.csproj -- --target=Deploy
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-            MARKETPLACE_PAT: ${{ secrets.MARKETPLACE_PAT }}
-
-        - name: Make a Release
-          if: github.ref_type == 'tag'
-          uses: ncipollo/release-action@v1
-          with:
-            name: 'MonoGame ${{ github.ref_name }}'
-            tag: ${{ github.ref_name }}
-            allowUpdates: true
-            removeArtifacts: true
-            artifacts: "nugets/*.nupkg;vsix/MonoGame.Templates.VSExtension.vsix"
-            token: ${{ secrets.GITHUB_TOKEN }}
+  # racecar: `deploy` removed. It publishes to NuGet and the VS marketplace via
+  # secrets.NUGET_API_KEY / secrets.MARKETPLACE_PAT, which a fork cannot see.
 
   choose-runner:
     runs-on: ubuntu-latest
@@ -411,7 +275,7 @@ jobs:
 
   tests:
     name: tests-${{ matrix.os }}
-    needs: [ build, pack-native-runtime, choose-runner ]
+    needs: [ build, choose-runner ]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
